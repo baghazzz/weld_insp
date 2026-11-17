@@ -1,0 +1,11 @@
+comparison,threshold_bits,n_within,pct_within
+test vs train (clean),0,1,0.03
+test vs train (clean),2,8,0.24
+test vs train (clean),4,19,0.58
+test vs train (clean),6,61,1.85
+test vs train (clean),8,126,3.82
+val vs train (clean),0,0,0.0
+val vs train (clean),2,5,0.15
+val vs train (clean),4,15,0.46
+val vs train (clean),6,56,1.7
+val vs train (clean),8,148,4.49

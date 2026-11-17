@@ -1,0 +1,11 @@
+comparison,threshold_bits,n_within,pct_within
+test vs train,0,2443,100.0
+test vs train,2,2443,100.0
+test vs train,4,2443,100.0
+test vs train,6,2443,100.0
+test vs train,8,2443,100.0
+val vs train,0,323,5.29
+val vs train,2,856,14.03
+val vs train,4,1340,21.96
+val vs train,6,1687,27.65
+val vs train,8,1948,31.93
