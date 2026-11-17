@@ -2,14 +2,17 @@
 
 Weld X-ray classifiers report ~99% accuracy on the RIAWELC benchmark but drop to ~64% macro-F1 on new radiographs
 (GDXray, WeldVGG 2025). This project tests **why**, and whether Vision Transformers, DINOv2 features or anomaly
-detection (PatchCore, a learned "golden path") hold up better, ending in a cost-based operating point that trades
-missed defects against false rejects.
+detection (PatchCore, a learned "golden path") hold up better on an **independent weld X-ray dataset (SWRD)**,
+ending in a cost-based operating point that trades missed defects against false rejects.
+
+> **Status:** work in progress. Labs 1, 2 and 4 are complete with results below. Labs 5–6 are running; Labs 3 and
+> 7–9 are being moved from GDXray to SWRD as the external test set (see *Why SWRD instead of GDXray*).
 
 ## Key finding so far: the benchmark leaks
 
 The official RIAWELC test folder (2,443 tiles) consists **entirely of byte-identical copies of training tiles, with the
 same labels**. 28% of validation tiles have a same-defect twin in training (perceptual hash within 6 bits). All tiles
-come from only 29 source radiographs (BAM round-robin plates `RRT-xxR`, the same source GDXray uses), and the
+come from only 29 source radiographs (BAM round-robin plates `RRT-xxR`), and the
 `Img1–Img4` sections of a plate are repeat scans of the same film. Published ~99% scores on this split measure
 memorisation. Every model here is trained and tested on a **leakage-free split grouped by plate** (70/15/15).
 
@@ -25,11 +28,25 @@ score **100.0%** test accuracy on the official split, and **61.3% / 51.8%** on u
 | val vs train (clean) | 0.00 | 1.70 |
 <!-- END leakage -->
 
+## Why SWRD instead of GDXray
+
+The original plan tested on GDXray Welds. Two problems:
+
+1. **GDXray is not independent of RIAWELC.** RIAWELC's file names (`RRT-xxR`) are BAM Round Robin Test radiographs,
+   and GDXray's weld series W0003 *is* that BAM round-robin set (W0001 is a selection from it). A "new data" test on
+   GDXray would partly re-test the radiographs the models were trained on.
+2. **The GDXray Welds download is no longer available** from the official link, and its annotations mark only
+   *where* a defect is, not its type.
+
+**SWRD** (Zhao et al., 2025; Beijing Institute of Technology) has 3,675 seam-weld radiographs from a different lab,
+labelled with six defect types: porosity, inclusion, crack, undercut, lack of fusion and lack of penetration. Crack,
+porosity and lack of penetration match RIAWELC classes directly, so SWRD allows both a defect-vs-no-defect test and a
+**per-type** transfer test.
+
 ## Headline results
 
-RIAWELC columns: 4-class, clean split, test plates never seen in training. "Binary" and GDXray columns: defect vs
-no defect (GDXray masks carry no defect type). "Unseen radiographs" excludes GDXray images that are RIAWELC
-train/val plates.
+RIAWELC columns: 4-class, clean split, test plates never seen in training. External-test columns will report SWRD
+(defect vs no defect, and per-type recall for crack, porosity and lack of penetration) once Labs 3 and 7 are rerun.
 
 <!-- BEGIN headline -->
 _Filled by notebook 09 from results/headline_table.csv after Labs 4–7 have run._
@@ -52,7 +69,8 @@ _Filled by notebook 09 from results/operating_points.csv._
 | Dataset | What | Licence | In this repo? |
 |---|---|---|---|
 | [RIAWELC](https://github.com/stefyste/RIAWELC) | 24,407 X-ray weld tiles (227×227, 8-bit), classes CR / PO / LP / ND | released freely, cite Totino et al. 2023 | no (downloaded by notebook 01), 4 demo tiles in `app/examples/` |
-| [GDXray Welds](https://github.com/computervision-xray-testing/GDXray) | BAM weld radiographs with defect masks (W0001/W0002) | research and education only, **no redistribution** | no (downloaded by notebook 03) |
+| [SWRD](https://github.com/bit628/RapidX-Annotator) | 3,675 seam-weld radiographs, 6 defect types with polygon labels; external test set | per the dataset providers' terms; cite Zhao et al. 2025 | no |
+| [GDXray Welds](https://github.com/computervision-xray-testing/GDXray) | BAM weld radiographs with binary defect masks; original external test set, replaced by SWRD | research and education only, **no redistribution** | no |
 
 Folder → class: `Difetto1` = CR (crack), `Difetto2` = PO (porosity), `Difetto4` = LP (lack of penetration),
 `NoDifetto` = ND (no defect); confirmed from the per-class counts in the RIAWELC paper.
@@ -63,16 +81,16 @@ Folder → class: `Difetto1` = CR (crack), `Difetto2` = PO (porosity), `Difetto4
 |---|---|---|---|
 | 1 | `01_data_exploration` | counts, samples, intensity histograms, source IDs from file names | CPU, 1 min |
 | 2 | `02_leakage_check` | pHash near-duplicate search; plate-grouped clean split | CPU, 1 min |
-| 3 | `03_gdxray_prep` | GDXray download, plate matching against RIAWELC, crops and binary labels | CPU, ~20 min |
+| 3 | `03_gdxray_prep` | external test set preparation; **being rewritten for SWRD** (crops labelled CR / PO / LP / ND) | CPU |
 | 4 | `04_classical_baseline` | HOG + LBP + GLCM + intensity features; SVM, Random Forest, Naive Bayes | CPU, ~30 min |
 | 5 | `05_cnn_baseline` | ResNet50 fine-tuning, 3 seeds, original vs clean split | T4 GPU, ~2 h |
 | 6 | `06_vit_dinov2` | ViT-S/16 fine-tuning; frozen DINOv2-S + logistic regression | T4 GPU, ~1 h |
-| 7 | `07_gdxray_generalisation` | zero-shot GDXray test of every model; augmentation retrain | T4 GPU, ~1 h |
+| 7 | `07_gdxray_generalisation` | zero-shot external test of every model (moving to SWRD, adding per-type recall); augmentation retrain | T4 GPU, ~1 h |
 | 8 | `08_anomaly_misjudgment` | PatchCore on good welds only; threshold sweep; cost-based operating points | T4 GPU, ~30 min |
-| 9 | `09_gradcam_package` | Grad-CAM + pointing game on GDXray masks; README/summary from results; Gradio demo | T4 GPU, ~15 min |
+| 9 | `09_gradcam_package` | Grad-CAM + pointing game on external-set defect outlines; README/summary from results; Gradio demo | T4 GPU, ~15 min |
 
 Rules followed throughout: model settings and thresholds are chosen on validation data only; the test split is
-touched once; GDXray is not used until the RIAWELC models are final.
+touched once; the external test set is not used until the RIAWELC models are final.
 
 ## How to rerun
 
@@ -91,9 +109,9 @@ Demo: `python app/app.py --share` (needs `checkpoints/resnet50_clean_seed42/best
 
 ## Limits
 
-- GDXray labels are defect / no defect only, so GDXray cannot test the per-type (CR/PO/LP) decision.
-- GDXray and RIAWELC share a source (BAM). Radiographs that match RIAWELC plates are reported separately, but even
-  "unseen" GDXray radiographs come from the same lab and scanner type: this is a mild domain shift, not a new factory.
+- SWRD has three defect types RIAWELC never saw (inclusion, undercut, lack of fusion); these can only be scored as
+  "defect vs no defect", not by type.
+- SWRD comes from one lab; a third dataset would be needed to claim generalisation across many sites.
 - 29 source plates is a small number of independent samples; results on 6 test plates carry real uncertainty.
 - The cost model (20× miss cost, 5% defect rate) is an assumption, not plant data.
 
@@ -102,6 +120,7 @@ Demo: `python app/app.py --share` (needs `checkpoints/resnet50_clean_seed42/best
 - Totino, Spagnolo, Perri (2023). RIAWELC: a novel dataset of radiographic images for automatic weld defects classification. IJECER.
 - Palma-Ramírez et al. (2024). Deep convolutional neural network for weld defect classification in radiographic images. Heliyon.
 - WeldVGG (2025). Sensors 25(19):6183.
+- Zhao et al. (2025). SWRD: a dataset of radiographic image of seam weld for defect detection. J. Nondestructive Evaluation 44(2).
 - Mery et al. (2015). GDXray: the database of X-ray images for nondestructive testing. J. Nondestructive Evaluation 34.
 - Roth et al. (2022). Towards total recall in industrial anomaly detection (PatchCore). CVPR.
 - Oquab et al. (2023). DINOv2: learning robust visual features without supervision.

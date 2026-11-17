@@ -1,10 +1,10 @@
-# Do weld-defect classifiers generalise? A leakage audit of RIAWELC and a zero-shot test on GDXray
+# Do weld-defect classifiers generalise? A leakage audit of RIAWELC and a zero-shot test on SWRD
 
 _Two-page summary. Tables marked "filled by notebook 09" are written from results/*.csv; edit only the prose._
 
 ## 1. Question
 
-Published weld-defect classifiers reach ~99% accuracy on RIAWELC but ~64% macro-F1 on GDXray radiographs. Is the
+Published weld-defect classifiers reach ~99% accuracy on RIAWELC but ~64% macro-F1 on GDXray radiographs. We test transfer on SWRD, an independent seam-weld dataset, because GDXray shares its source radiographs with RIAWELC. Is the
 drop a property of the models, or of how they were tested? And do newer models (ViT, DINOv2) or anomaly detection
 trained only on good welds generalise better?
 
@@ -38,9 +38,9 @@ clean split, seed 42, settings chosen on validation.
 _Filled by notebook 09._
 <!-- END headline -->
 
-## 4. GDXray result
+## 4. SWRD (external test) result
 
-_Write 3–4 sentences: the RIAWELC-binary → GDXray drop per model, seen vs unseen radiographs, which class the models
+_Write 3–4 sentences: the RIAWELC → SWRD drop per model (defect vs no defect, and per-type recall), which class the models
 fall back to, whether augmentation changed anything, and whether you reproduce WeldVGG's ~0.64._
 
 <!-- BEGIN anomaly -->
@@ -50,7 +50,7 @@ _Filled by notebook 09._
 ## 5. Operating-point recommendation
 
 Assumptions: a missed defect costs 20× a false reject; 5% of production welds are defective; threshold set on
-validation data and applied unchanged to test and GDXray.
+validation data and applied unchanged to test and SWRD.
 
 <!-- BEGIN operating -->
 _Filled by notebook 09._
@@ -61,8 +61,8 @@ good welds it rejects, and what must happen before deployment (re-set the thresh
 
 ## Limitations and next step
 
-1. GDXray labels are binary, so per-type generalisation is untested.
-2. GDXray and RIAWELC both come from BAM radiographs: a mild domain shift, not a new plant or scanner.
+1. SWRD's inclusion, undercut and lack-of-fusion classes have no RIAWELC counterpart and are scored only as defect vs no defect.
+2. SWRD is one lab; a third dataset would be needed to claim broad generalisation.
 3. 29 plates (6 in test) is a small number of independent samples; differences of a few points may be noise.
 
 **Next step:** _e.g. a second external dataset from a different lab, or fine-tuning on a small labelled sample of the

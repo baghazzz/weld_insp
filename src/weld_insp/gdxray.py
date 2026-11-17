@@ -36,18 +36,45 @@ ND_MARGIN = 10       # ND only if no defect pixel within the window grown by 10 
 MAX_ND_PER_IMAGE = 300
 
 
+GDXRAY_URLS = [
+    GDXRAY_WELDS_URL,
+    "https://www.dropbox.com/scl/fi/im896nbhllnbnol585fsq/Welds.zip?rlkey=u584im2jtrdxzmhrg2lcqtavv&dl=1",
+    "https://dl.dropboxusercontent.com/scl/fi/im896nbhllnbnol585fsq/Welds.zip?rlkey=u584im2jtrdxzmhrg2lcqtavv&dl=1",
+]
+
+
 def download_welds(paths) -> Path:
     """Download GDXray Welds (~209 MB) to data/gdxray_welds.zip once, then extract
-    to paths.gdxray. Returns the folder holding W0001, W0002, ..."""
+    to paths.gdxray. Returns the folder holding W0001, W0002, ...
+
+    Dropbox sometimes answers a script with a web page instead of the file, so every
+    download is checked: a file that is not a real zip is deleted and the next link
+    is tried. If all fail, download Welds.zip in your browser from the GDXray README
+    and upload it to data/ as gdxray_welds.zip."""
     if any(paths.gdxray.rglob("W0001")):              # already extracted
         return find_series_root(paths.gdxray)
     zip_path = paths.data / "gdxray_welds.zip"
+    if zip_path.exists() and not zipfile.is_zipfile(zip_path):
+        print(f"Removing a bad earlier download ({zip_path.stat().st_size:,} bytes, not a zip)")
+        zip_path.unlink()
     if not zip_path.exists():
-        print("Downloading GDXray Welds (209 MB) ...")
-        subprocess.run(["wget", "-q", "-O", str(zip_path), GDXRAY_WELDS_URL], check=True)
-    if not any(paths.gdxray.rglob("W0001*")):
-        with zipfile.ZipFile(zip_path) as z:
-            z.extractall(paths.gdxray)
+        tmp = paths.work / "gdxray_download.zip"
+        for url in GDXRAY_URLS:
+            print("Downloading GDXray Welds (209 MB) from", url.split("?")[0], "...")
+            subprocess.run(["curl", "-L", "--fail", "-sS", "-A", "Mozilla/5.0", "-o", str(tmp), url])
+            if tmp.exists() and zipfile.is_zipfile(tmp):
+                if tmp != zip_path:
+                    import shutil
+                    shutil.copy(tmp, zip_path)
+                break
+            head = tmp.read_bytes()[:200] if tmp.exists() else b""
+            print("  not a zip, got:", head[:120])
+        else:
+            raise RuntimeError("GDXray download failed. Download Welds.zip in your browser from "
+                               "github.com/computervision-xray-testing/GDXray and upload it to "
+                               f"{zip_path}")
+    with zipfile.ZipFile(zip_path) as z:
+        z.extractall(paths.gdxray)
     return find_series_root(paths.gdxray)
 
 
